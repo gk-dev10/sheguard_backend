@@ -8,6 +8,8 @@ import (
 	"github.com/gk-dev10/sheguard_backend/internal/auth"
 	"github.com/gk-dev10/sheguard_backend/internal/db"
 	"github.com/gk-dev10/sheguard_backend/internal/routes"
+	"github.com/gk-dev10/sheguard_backend/internal/utils"
+	"github.com/go-playground/validator/v10"
 	"github.com/joho/godotenv"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/gommon/log"
@@ -20,6 +22,9 @@ func Test(c echo.Context) error {
 
 func main() {
 	e := echo.New()
+	e.Validator = &utils.CustomValidator{
+		Validator: validator.New(),
+	}
 	godotenv.Load()
 	ctx := context.Background()
 	err := db.Init(ctx)
