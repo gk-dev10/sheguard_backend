@@ -6,8 +6,6 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-func AuthRoutes(e *echo.Group) {
-	e.POST("/login", controller.Login)
-	e.POST("/signup",controller.Signup)
-	e.POST("/logout",controller.Logout,middleware.SupabaseAuth)
+func UserRoutes(e *echo.Group){
+	e.GET("/me",controller.GetMe,middleware.SupabaseAuth)
 }

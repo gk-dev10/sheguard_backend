@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/gk-dev10/sheguard_backend/internal/auth"
 	"github.com/gk-dev10/sheguard_backend/internal/db"
 	"github.com/gk-dev10/sheguard_backend/internal/routes"
 	"github.com/joho/godotenv"
@@ -23,7 +24,10 @@ func main() {
 	ctx := context.Background()
 	err := db.Init(ctx)
 	if err!= nil{
-		log.Fatal(err) //to end the program if db is not connected
+		log.Fatal(err) //used log.fatal to end the program if db is not connected(no panic or no fmt.print)
+	}
+		if err := auth.InitJWKS(); err != nil {
+		log.Fatal("JWKS init failed:", err)
 	}
 
 	//Test route
@@ -32,6 +36,7 @@ func main() {
 	api := e.Group("/api")
 
 	routes.AuthRoutes(api.Group("/auth"))
+	routes.UserRoutes(api.Group(""))
 
 	if err := e.Start(":8080"); err != nil {
 		e.Logger.Fatal(err)
