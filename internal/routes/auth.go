@@ -7,4 +7,6 @@ import (
 
 func AuthRoutes(e *echo.Group) {
 	e.POST("/login", controller.Login)
+	e.POST("/signup",controller.Signup)
+	e.POST("/logout",controller.Logout)
 }

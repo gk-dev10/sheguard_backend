@@ -7,10 +7,12 @@ import (
 	"os"
 	"time"
 
+	"github.com/gk-dev10/sheguard_backend/internal/sqlc"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 var Pool *pgxpool.Pool
+var Queries *sqlc.Queries
 
 func Init(ctx context.Context) error {
 	url := os.Getenv("SUPABASE_DB_URL")
@@ -42,7 +44,8 @@ func Init(ctx context.Context) error {
 	}
 
 	Pool = pool
-	fmt.Println("Supabase Database Connected Successfully")
+	Queries = sqlc.New(pool)
+	fmt.Println("\nHurraayyy, Supabase Database Connected Successfully")
 	return nil
 }
 
