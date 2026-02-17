@@ -7,23 +7,13 @@ import (
 	"os"
 
 	"github.com/gk-dev10/sheguard_backend/internal/db"
-	"github.com/labstack/echo/v4"
+	"github.com/gk-dev10/sheguard_backend/internal/dto"
 	"github.com/jackc/pgx/v5/pgtype"
-
+	"github.com/labstack/echo/v4"
 )
 
-type LoginRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password" validate:"len=6,numeric"`
-}
-
-type SignupRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password" validate:"len=6,numeric"`
-}
-
 func Login(c echo.Context) error {
-	var req LoginRequest
+	var req dto.LoginRequest
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, echo.Map{
 			"error": "invalid request",
@@ -93,7 +83,7 @@ func Logout(c echo.Context) error {
 }
 
 func Signup(c echo.Context) error {
-	var req SignupRequest
+	var req dto.SignupRequest
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, echo.Map{
 			"error": "invalid request",

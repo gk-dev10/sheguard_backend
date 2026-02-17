@@ -4,19 +4,12 @@ import (
 	"net/http"
 
 	"github.com/gk-dev10/sheguard_backend/internal/db"
+	"github.com/gk-dev10/sheguard_backend/internal/dto"
 	"github.com/gk-dev10/sheguard_backend/internal/sqlc"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/labstack/echo/v4"
 )
 
-type UpdateProfileRequest struct {
-	Name            *string `json:"name"`
-	PhoneNumber     *string `json:"phone_number"`
-	ProfileImageURL *string `json:"profile_image_url"`
-	BloodGroup      *string `json:"blood_group"`
-	Allergies       *string `json:"allergies"`
-	Medications     *string `json:"medications"`
-}
 
 
 func GetMe(c echo.Context) error {
@@ -38,7 +31,7 @@ func GetMe(c echo.Context) error {
 func UpdateMe(c echo.Context) error {
 	userID := c.Get("user_id").(string)
 
-	var req UpdateProfileRequest
+	var req dto.UpdateProfileRequest
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, echo.Map{"error": "invalid body"})
 	}
