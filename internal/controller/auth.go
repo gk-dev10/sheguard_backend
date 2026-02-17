@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/gk-dev10/sheguard_backend/internal/db"
+	"github.com/gk-dev10/sheguard_backend/internal/utils"
 	"github.com/labstack/echo/v4"
 	"github.com/jackc/pgx/v5/pgtype"
 
@@ -19,7 +20,7 @@ type LoginRequest struct {
 
 type SignupRequest struct {
 	Email    string `json:"email"`
-	Password string `json:"password"`
+	Password string `json:"password len:4 num"`
 }
 
 func Login(c echo.Context) error {
@@ -29,6 +30,11 @@ func Login(c echo.Context) error {
 			"error": "invalid request",
 		})
 	}
+	if !utils.IsValidPIN(req.Password) {
+	return c.JSON(http.StatusBadRequest, echo.Map{
+		"error": "PIN must be exactly 4 digits",
+	})
+}
 
 	url := os.Getenv("SUPABASE_URL") + "/auth/v1/token?grant_type=password"
 	body, _ := json.Marshal(req)
@@ -94,7 +100,11 @@ func Signup(c echo.Context) error {
 			"error": "invalid request",
 		})
 	}
-
+		if !utils.IsValidPIN(req.Password) {
+	return c.JSON(http.StatusBadRequest, echo.Map{
+		"error": "PIN must be exactly 4 digits",
+	})
+}
 	url := os.Getenv("SUPABASE_URL") + "/auth/v1/signup"
 	body, _ := json.Marshal(req)
 
