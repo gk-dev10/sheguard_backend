@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"time"
 
@@ -41,6 +42,7 @@ func Init(ctx context.Context) error {
 	}
 
 	Pool = pool
+	fmt.Println("Supabase Database Connected Successfully")
 	return nil
 }
 

@@ -30,9 +30,8 @@ func main() {
 	e.GET("/", Test)
 
 	api := e.Group("/api")
-	v1 := api.Group("/v1")
 
-	routes.AuthRoutes(v1.Group("/auth"))
+	routes.AuthRoutes(api.Group("/auth"))
 
 	if err := e.Start(":8080"); err != nil {
 		e.Logger.Fatal(err)

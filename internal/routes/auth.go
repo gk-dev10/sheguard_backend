@@ -6,5 +6,5 @@ import (
 )
 
 func AuthRoutes(e *echo.Group) {
-	e.GET("/login", controller.Login)
+	e.POST("/login", controller.Login)
 }
