@@ -9,7 +9,7 @@ import (
 )
 
 func Test(c echo.Context) error {
-	fmt.Println("Route hit!")
+	fmt.Println("Server is running , healthy ! ")
 	return c.String(http.StatusOK, "Hello whomever!, This is sheguard's backend, Back up!!")
 }
 
