@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gk-dev10/sheguard_backend/internal/routes"
+	"github.com/joho/godotenv"
 	"github.com/labstack/echo/v4"
 )
 
@@ -15,7 +16,7 @@ func Test(c echo.Context) error {
 
 func main() {
 	e := echo.New()
-
+	godotenv.Load()
 	//Test route
 	e.GET("/", Test)
 
