@@ -3,10 +3,21 @@ package controller
 import (
 	"net/http"
 
+	"github.com/gk-dev10/sheguard_backend/internal/db"
+	"github.com/gk-dev10/sheguard_backend/internal/sqlc"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/labstack/echo/v4"
-	"github.com/gk-dev10/sheguard_backend/internal/db"
 )
+
+type UpdateProfileRequest struct {
+	Name            *string `json:"name"`
+	PhoneNumber     *string `json:"phone_number"`
+	ProfileImageURL *string `json:"profile_image_url"`
+	BloodGroup      *string `json:"blood_group"`
+	Allergies       *string `json:"allergies"`
+	Medications     *string `json:"medications"`
+}
+
 
 func GetMe(c echo.Context) error {
 	userIDStr := c.Get("user_id").(string)
@@ -21,5 +32,36 @@ func GetMe(c echo.Context) error {
 		})
 	}
 
+	return c.JSON(http.StatusOK, profile)
+}
+
+func UpdateMe(c echo.Context) error {
+	userID := c.Get("user_id").(string)
+
+	var req UpdateProfileRequest
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "invalid body"})
+	}
+	var uid pgtype.UUID
+	_ = uid.Scan(userID)
+	params := sqlc.UpdateProfileParams{
+		ID:              uid,
+		Name:            req.Name,
+		PhoneNumber:     req.PhoneNumber,
+		ProfileImageUrl: req.ProfileImageURL,
+		BloodGroup: req.BloodGroup,
+		Allergies:       req.Allergies,
+		Medications:     req.Medications,
+	}
+
+	profile, err := db.Queries.UpdateProfile(
+		c.Request().Context(),
+		params,
+	)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{
+			"error": "update failed",
+		})
+	}
 	return c.JSON(http.StatusOK, profile)
 }

@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   name TEXT,
   phone_number TEXT,
   profile_image_url TEXT,
-  blood_group TEXT DEFAULT 'Not Set' NOT NULL,
+  blood_group TEXT DEFAULT 'Not Set',
   allergies TEXT,
   medications TEXT,
   notification_preferences JSONB DEFAULT '{}'::jsonb,

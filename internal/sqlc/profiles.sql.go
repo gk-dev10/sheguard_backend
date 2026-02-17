@@ -58,3 +58,56 @@ func (q *Queries) UpdateLastLogin(ctx context.Context, id pgtype.UUID) error {
 	_, err := q.db.Exec(ctx, updateLastLogin, id)
 	return err
 }
+
+const updateProfile = `-- name: UpdateProfile :one
+UPDATE profiles
+SET
+  name = COALESCE($2, name),
+  phone_number = COALESCE($3, phone_number),
+  profile_image_url = COALESCE($4, profile_image_url),
+  blood_group = COALESCE($5, blood_group),
+  allergies = COALESCE($6, allergies),
+  medications = COALESCE($7, medications),
+  updated_at = now()
+WHERE id = $1
+RETURNING id, name, phone_number, profile_image_url, blood_group, allergies, medications, notification_preferences, device_tokens, is_active, created_at, updated_at, last_login_at
+`
+
+type UpdateProfileParams struct {
+	ID              pgtype.UUID `json:"id"`
+	Name            *string     `json:"name"`
+	PhoneNumber     *string     `json:"phone_number"`
+	ProfileImageUrl *string     `json:"profile_image_url"`
+	BloodGroup      *string     `json:"blood_group"`
+	Allergies       *string     `json:"allergies"`
+	Medications     *string     `json:"medications"`
+}
+
+func (q *Queries) UpdateProfile(ctx context.Context, arg UpdateProfileParams) (Profile, error) {
+	row := q.db.QueryRow(ctx, updateProfile,
+		arg.ID,
+		arg.Name,
+		arg.PhoneNumber,
+		arg.ProfileImageUrl,
+		arg.BloodGroup,
+		arg.Allergies,
+		arg.Medications,
+	)
+	var i Profile
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.PhoneNumber,
+		&i.ProfileImageUrl,
+		&i.BloodGroup,
+		&i.Allergies,
+		&i.Medications,
+		&i.NotificationPreferences,
+		&i.DeviceTokens,
+		&i.IsActive,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.LastLoginAt,
+	)
+	return i, err
+}

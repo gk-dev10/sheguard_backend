@@ -8,4 +8,5 @@ import (
 
 func UserRoutes(e *echo.Group){
 	e.GET("/me",controller.GetMe,middleware.SupabaseAuth)
-}
+	e.PATCH("/me", controller.UpdateMe,middleware.SupabaseAuth)
+}	

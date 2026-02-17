@@ -10,15 +10,15 @@ import (
 
 type Profile struct {
 	ID                      pgtype.UUID        `json:"id"`
-	Name                    pgtype.Text        `json:"name"`
-	PhoneNumber             pgtype.Text        `json:"phone_number"`
-	ProfileImageUrl         pgtype.Text        `json:"profile_image_url"`
-	BloodGroup              string             `json:"blood_group"`
-	Allergies               pgtype.Text        `json:"allergies"`
-	Medications             pgtype.Text        `json:"medications"`
+	Name                    *string            `json:"name"`
+	PhoneNumber             *string            `json:"phone_number"`
+	ProfileImageUrl         *string            `json:"profile_image_url"`
+	BloodGroup              *string            `json:"blood_group"`
+	Allergies               *string            `json:"allergies"`
+	Medications             *string            `json:"medications"`
 	NotificationPreferences []byte             `json:"notification_preferences"`
 	DeviceTokens            []byte             `json:"device_tokens"`
-	IsActive                pgtype.Bool        `json:"is_active"`
+	IsActive                *bool              `json:"is_active"`
 	CreatedAt               pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt               pgtype.Timestamptz `json:"updated_at"`
 	LastLoginAt             pgtype.Timestamptz `json:"last_login_at"`
