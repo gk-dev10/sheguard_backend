@@ -82,7 +82,9 @@ func Logout(c echo.Context) error {
 		})
 	}
 	defer resp.Body.Close()
-	return c.NoContent(http.StatusNoContent)
+	return c.JSON(http.StatusOK, echo.Map{
+		"message": "logged out",
+	})
 }
 
 func Signup(c echo.Context) error {
