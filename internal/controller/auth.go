@@ -20,8 +20,8 @@ func Login(c echo.Context) error {
 		})
 	}
 	if err := c.Validate(&req); err != nil {
-	return c.JSON(http.StatusBadRequest, echo.Map{
-		"error": err.Error(),
+		return c.JSON(http.StatusBadRequest, echo.Map{
+			"error": err.Error(),
 		})
 	}
 
@@ -89,9 +89,9 @@ func Signup(c echo.Context) error {
 			"error": "invalid request",
 		})
 	}
-		if err := c.Validate(&req); err != nil {
-	return c.JSON(http.StatusBadRequest, echo.Map{
-		"error": err.Error(),
+	if err := c.Validate(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{
+			"error": err.Error(),
 		})
 	}
 	url := os.Getenv("SUPABASE_URL") + "/auth/v1/signup"
@@ -121,5 +121,41 @@ func Signup(c echo.Context) error {
 			}
 		}
 	}
+	return c.JSON(resp.StatusCode, result)
+}
+
+func RefreshToken(c echo.Context) error {
+	var req dto.RefreshRequest
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{
+			"error": "invalid request",
+		})
+	}
+	if err := c.Validate(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{
+			"error": err.Error(),
+		})
+	}
+
+	url := os.Getenv("SUPABASE_URL") + "/auth/v1/token?grant_type=refresh_token"
+	body, _ := json.Marshal(map[string]string{
+		"refresh_token": req.RefreshToken,
+	})
+
+	httpReq, _ := http.NewRequest("POST", url, bytes.NewBuffer(body))
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("apikey", os.Getenv("SUPABASE_ANON_KEY"))
+
+	resp, err := http.DefaultClient.Do(httpReq)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{
+			"error": err.Error(),
+		})
+	}
+	defer resp.Body.Close()
+
+	var result map[string]interface{}
+	json.NewDecoder(resp.Body).Decode(&result)
+
 	return c.JSON(resp.StatusCode, result)
 }

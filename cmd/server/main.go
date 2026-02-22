@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"os"
 
 	"github.com/gk-dev10/sheguard_backend/internal/auth"
 	"github.com/gk-dev10/sheguard_backend/internal/db"
@@ -43,7 +44,12 @@ func main() {
 	routes.AuthRoutes(api.Group("/auth"))
 	routes.UserRoutes(api.Group(""))
 
-	if err := e.Start(":8080"); err != nil {
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	if err := e.Start(":" + port); err != nil {
 		e.Logger.Fatal(err)
 	}
 }

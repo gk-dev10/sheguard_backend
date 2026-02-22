@@ -8,6 +8,18 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type Contact struct {
+	ID          pgtype.UUID        `json:"id"`
+	UserID      pgtype.UUID        `json:"user_id"`
+	Name        string             `json:"name"`
+	PhoneNumber string             `json:"phone_number"`
+	ImageUri    *string            `json:"image_uri"`
+	Type        *string            `json:"type"`
+	IsPinned    *bool              `json:"is_pinned"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
 type Profile struct {
 	ID                      pgtype.UUID        `json:"id"`
 	Name                    *string            `json:"name"`
