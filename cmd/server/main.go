@@ -29,10 +29,10 @@ func main() {
 	godotenv.Load()
 	ctx := context.Background()
 	err := db.Init(ctx)
-	if err!= nil{
+	if err != nil {
 		log.Fatal(err) //used log.fatal to end the program if db is not connected(no panic or no fmt.print)
 	}
-		if err := auth.InitJWKS(); err != nil {
+	if err := auth.InitJWKS(); err != nil {
 		log.Fatal("JWKS init failed:", err)
 	}
 
