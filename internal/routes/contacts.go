@@ -8,7 +8,7 @@ import (
 
 func ContactRoutes(e *echo.Group) {
 	// All contact routes require authentication
-	e.Use(middleware.SupabaseAuth)
+	e.Use(middleware.AppwriteAuth)
 
 	e.GET("", controller.GetContacts)
 	e.POST("", controller.CreateContact)

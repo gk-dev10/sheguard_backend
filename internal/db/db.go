@@ -1,57 +1,51 @@
 package db
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"os"
-	"time"
 
-	"github.com/gk-dev10/sheguard_backend/internal/sqlc"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/appwrite/sdk-for-go/appwrite"
+	"github.com/appwrite/sdk-for-go/client"
+	"github.com/appwrite/sdk-for-go/databases"
+	"github.com/appwrite/sdk-for-go/users"
 )
 
-var Pool *pgxpool.Pool
-var Queries *sqlc.Queries
+var Client client.Client
+var Databases *databases.Databases
+var Users *users.Users
 
-func Init(ctx context.Context) error {
-	url := os.Getenv("SUPABASE_DB_URL")
-	if url == "" {
-		return errors.New("SUPABASE_DB_URL is not set")
+// Collection config loaded from env
+var DatabaseID string
+var ProfilesCollectionID string
+var ContactsCollectionID string
+
+func Init() error {
+	endpoint := os.Getenv("APPWRITE_ENDPOINT")
+	projectID := os.Getenv("APPWRITE_PROJECT_ID")
+	apiKey := os.Getenv("APPWRITE_API_KEY")
+
+	if endpoint == "" || projectID == "" || apiKey == "" {
+		return errors.New("APPWRITE_ENDPOINT, APPWRITE_PROJECT_ID, and APPWRITE_API_KEY must be set")
 	}
 
-	cfg, err := pgxpool.ParseConfig(url)
-	if err != nil {
-		return err
+	DatabaseID = os.Getenv("APPWRITE_DATABASE_ID")
+	ProfilesCollectionID = os.Getenv("APPWRITE_PROFILES_COLLECTION_ID")
+	ContactsCollectionID = os.Getenv("APPWRITE_CONTACTS_COLLECTION_ID")
+
+	if DatabaseID == "" || ProfilesCollectionID == "" || ContactsCollectionID == "" {
+		return errors.New("APPWRITE_DATABASE_ID, APPWRITE_PROFILES_COLLECTION_ID, and APPWRITE_CONTACTS_COLLECTION_ID must be set")
 	}
 
-	// pool tuning - Prod level
-	cfg.MaxConns = 10
-	cfg.MinConns = 2
-	cfg.MaxConnLifetime = time.Hour
-	cfg.MaxConnIdleTime = 30 * time.Minute
-	cfg.HealthCheckPeriod = 1 * time.Minute
+	Client = appwrite.NewClient(
+		appwrite.WithEndpoint(endpoint),
+		appwrite.WithProject(projectID),
+		appwrite.WithKey(apiKey),
+	)
 
-	pool, err := pgxpool.NewWithConfig(ctx, cfg)
-	if err != nil {
-		return err
-	}
-	ctxPing, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
+	Databases = appwrite.NewDatabases(Client)
+	Users = appwrite.NewUsers(Client)
 
-	if err := pool.Ping(ctxPing); err != nil {
-		return err
-	}
-
-	Pool = pool
-	Queries = sqlc.New(pool)
-	fmt.Println("\nHurraayyy, Supabase Database Connected Successfully")
+	fmt.Println("\nAppwrite client initialized successfully")
 	return nil
-}
-
-// to shut down the pool.
-func Close() {
-	if Pool != nil {
-		Pool.Close()
-	}
 }

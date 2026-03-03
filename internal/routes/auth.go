@@ -9,6 +9,6 @@ import (
 func AuthRoutes(e *echo.Group) {
 	e.POST("/login", controller.Login)
 	e.POST("/signup", controller.Signup)
-	e.POST("/logout", controller.Logout, middleware.SupabaseAuth)
-	e.POST("/refresh", controller.RefreshToken)
+	e.POST("/logout", controller.Logout, middleware.AppwriteAuth)
+	e.POST("/refresh", controller.RefreshToken, middleware.AppwriteAuth)
 }

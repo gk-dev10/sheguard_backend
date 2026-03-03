@@ -3,52 +3,67 @@ package controller
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
-	"os"
+	"time"
 
 	"github.com/gk-dev10/sheguard_backend/internal/db"
 	"github.com/gk-dev10/sheguard_backend/internal/dto"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/labstack/echo/v4"
+
+	"github.com/appwrite/sdk-for-go/id"
 )
 
 func Login(c echo.Context) error {
 	var req dto.LoginRequest
 	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, echo.Map{
-			"error": "invalid request",
-		})
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "invalid request"})
 	}
 	if err := c.Validate(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, echo.Map{
-			"error": err.Error(),
-		})
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": err.Error()})
 	}
 
-	url := os.Getenv("SUPABASE_URL") + "/auth/v1/token?grant_type=password"
-	body, _ := json.Marshal(req)
+	// Proxy login to Appwrite REST API to create an email/password session.
+	loginURL := fmt.Sprintf("%s/account/sessions/email", db.Client.Endpoint)
+	body, _ := json.Marshal(map[string]string{
+		"email":    req.Email,
+		"password": req.Password,
+	})
 
-	httpReq, _ := http.NewRequest("POST", url, bytes.NewBuffer(body))
+	httpReq, _ := http.NewRequest("POST", loginURL, bytes.NewBuffer(body))
 	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("apikey", os.Getenv("SUPABASE_ANON_KEY"))
+	httpReq.Header.Set("X-Appwrite-Project", db.Client.Headers["X-Appwrite-Project"])
 
 	resp, err := http.DefaultClient.Do(httpReq)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, echo.Map{
-			"error": err.Error(),
-		})
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": err.Error()})
 	}
 	defer resp.Body.Close()
 
 	var result map[string]interface{}
 	json.NewDecoder(resp.Body).Decode(&result)
 
-	var uid pgtype.UUID
-	if userRaw, ok := result["user"]; ok {
-		if userMap, ok := userRaw.(map[string]interface{}); ok {
-			if id, ok := userMap["id"].(string); ok {
-				uid.Scan(id)
-				db.Queries.UpdateLastLogin(c.Request().Context(), uid)
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		// Update last login in profile
+		if userID, ok := result["userId"].(string); ok {
+			go func() {
+				db.Databases.UpdateDocument(
+					db.DatabaseID,
+					db.ProfilesCollectionID,
+					userID,
+					db.Databases.WithUpdateDocumentData(map[string]interface{}{
+						"last_login_at": time.Now().UTC().Format(time.RFC3339),
+					}),
+				)
+			}()
+
+			// Create a JWT for the user to use with our backend
+			jwt, jwtErr := db.Users.CreateJWT(
+				userID,
+				db.Users.WithCreateJWTDuration(3600),
+			)
+			if jwtErr == nil {
+				result["jwt"] = jwt.Jwt
 			}
 		}
 	}
@@ -57,105 +72,62 @@ func Login(c echo.Context) error {
 }
 
 func Logout(c echo.Context) error {
-	token := c.Request().Header.Get("Authorization")
-	if token == "" {
-		return c.JSON(http.StatusUnauthorized, echo.Map{
-			"error": "missing token",
-		})
-	}
-
-	url := os.Getenv("SUPABASE_URL") + "/auth/v1/logout"
-
-	httpReq, _ := http.NewRequest("POST", url, nil)
-	httpReq.Header.Set("Authorization", token)
-	httpReq.Header.Set("apikey", os.Getenv("SUPABASE_ANON_KEY"))
-
-	resp, err := http.DefaultClient.Do(httpReq)
-	if err != nil {
-		return c.JSON(http.StatusInternalServerError, echo.Map{
-			"error": err.Error(),
-		})
-	}
-	defer resp.Body.Close()
-	return c.JSON(http.StatusOK, echo.Map{
-		"message": "logged out",
-	})
+	// With Appwrite, logout is handled client-side by deleting the session.
+	return c.JSON(http.StatusOK, echo.Map{"message": "logged out"})
 }
 
 func Signup(c echo.Context) error {
 	var req dto.SignupRequest
 	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, echo.Map{
-			"error": "invalid request",
-		})
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "invalid request"})
 	}
 	if err := c.Validate(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, echo.Map{
-			"error": err.Error(),
-		})
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": err.Error()})
 	}
-	url := os.Getenv("SUPABASE_URL") + "/auth/v1/signup"
-	body, _ := json.Marshal(req)
 
-	httpReq, _ := http.NewRequest("POST", url, bytes.NewBuffer(body))
-	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("apikey", os.Getenv("SUPABASE_ANON_KEY"))
-
-	resp, err := http.DefaultClient.Do(httpReq)
+	// Create user via server SDK (Users API)
+	user, err := db.Users.Create(
+		id.Unique(),
+		db.Users.WithCreateEmail(req.Email),
+		db.Users.WithCreatePassword(req.Password),
+	)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, echo.Map{
-			"error": err.Error(),
-		})
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "signup failed: " + err.Error()})
 	}
-	defer resp.Body.Close()
 
-	var result map[string]interface{}
-	json.NewDecoder(resp.Body).Decode(&result)
-
-	var uid pgtype.UUID
-	if userRaw, ok := result["user"]; ok {
-		if userMap, ok := userRaw.(map[string]interface{}); ok {
-			if id, ok := userMap["id"].(string); ok {
-				uid.Scan(id)
-				db.Queries.CreateProfile(c.Request().Context(), uid)
-			}
-		}
+	// Create a profile document using the user's ID as the document ID
+	_, profileErr := db.Databases.CreateDocument(
+		db.DatabaseID,
+		db.ProfilesCollectionID,
+		user.Id,
+		map[string]interface{}{},
+	)
+	if profileErr != nil {
+		fmt.Printf("Warning: failed to create profile for user %s: %v\n", user.Id, profileErr)
 	}
-	return c.JSON(resp.StatusCode, result)
+
+	return c.JSON(http.StatusCreated, echo.Map{
+		"user_id": user.Id,
+		"email":   user.Email,
+		"message": "signup successful",
+	})
 }
 
 func RefreshToken(c echo.Context) error {
-	var req dto.RefreshRequest
-	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, echo.Map{
-			"error": "invalid request",
-		})
-	}
-	if err := c.Validate(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, echo.Map{
-			"error": err.Error(),
-		})
+	userID := c.Get("user_id")
+	if userID == nil {
+		return c.JSON(http.StatusUnauthorized, echo.Map{"error": "authentication required"})
 	}
 
-	url := os.Getenv("SUPABASE_URL") + "/auth/v1/token?grant_type=refresh_token"
-	body, _ := json.Marshal(map[string]string{
-		"refresh_token": req.RefreshToken,
-	})
-
-	httpReq, _ := http.NewRequest("POST", url, bytes.NewBuffer(body))
-	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("apikey", os.Getenv("SUPABASE_ANON_KEY"))
-
-	resp, err := http.DefaultClient.Do(httpReq)
+	jwt, err := db.Users.CreateJWT(
+		userID.(string),
+		db.Users.WithCreateJWTDuration(3600),
+	)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, echo.Map{
-			"error": err.Error(),
-		})
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed to create token"})
 	}
-	defer resp.Body.Close()
 
-	var result map[string]interface{}
-	json.NewDecoder(resp.Body).Decode(&result)
-
-	return c.JSON(resp.StatusCode, result)
+	return c.JSON(http.StatusOK, echo.Map{
+		"jwt": jwt.Jwt,
+	})
 }

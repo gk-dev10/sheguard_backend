@@ -5,15 +5,14 @@ import (
 
 	"github.com/gk-dev10/sheguard_backend/internal/db"
 	"github.com/gk-dev10/sheguard_backend/internal/dto"
-	"github.com/gk-dev10/sheguard_backend/internal/sqlc"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/labstack/echo/v4"
+
+	"github.com/appwrite/sdk-for-go/id"
+	"github.com/appwrite/sdk-for-go/query"
 )
 
 func CreateContact(c echo.Context) error {
-	userIDStr := c.Get("user_id").(string)
-	var uid pgtype.UUID
-	_ = uid.Scan(userIDStr)
+	userID := c.Get("user_id").(string)
 
 	var req dto.CreateContactRequest
 	if err := c.Bind(&req); err != nil {
@@ -23,90 +22,144 @@ func CreateContact(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, echo.Map{"error": err.Error()})
 	}
 
-	params := sqlc.CreateContactParams{
-		UserID:      uid,
-		Name:        req.Name,
-		PhoneNumber: req.PhoneNumber,
-		ImageUri:    req.ImageURI,
-		Type:        req.Type,
-		IsPinned:    req.IsPinned,
+	data := map[string]interface{}{
+		"user_id":      userID,
+		"name":         req.Name,
+		"phone_number": req.PhoneNumber,
+	}
+	if req.ImageURI != nil {
+		data["image_uri"] = *req.ImageURI
+	}
+	if req.Type != nil {
+		data["type"] = *req.Type
+	}
+	if req.IsPinned != nil {
+		data["is_pinned"] = *req.IsPinned
 	}
 
-	contact, err := db.Queries.CreateContact(c.Request().Context(), params)
+	doc, err := db.Databases.CreateDocument(
+		db.DatabaseID,
+		db.ContactsCollectionID,
+		id.Unique(),
+		data,
+	)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed to create contact"})
 	}
 
-	return c.JSON(http.StatusCreated, contact)
+	var result map[string]interface{}
+	doc.Decode(&result)
+	return c.JSON(http.StatusCreated, result)
 }
 
 func GetContacts(c echo.Context) error {
-	userIDStr := c.Get("user_id").(string)
-	var uid pgtype.UUID
-	_ = uid.Scan(userIDStr)
+	userID := c.Get("user_id").(string)
 
-	contacts, err := db.Queries.GetContacts(c.Request().Context(), uid)
+	docs, err := db.Databases.ListDocuments(
+		db.DatabaseID,
+		db.ContactsCollectionID,
+		db.Databases.WithListDocumentsQueries([]string{
+			query.Equal("user_id", userID),
+			query.OrderDesc("is_pinned"),
+			query.OrderAsc("name"),
+		}),
+	)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed to fetch contacts"})
 	}
 
-	return c.JSON(http.StatusOK, contacts)
+	var result map[string]interface{}
+	docs.Decode(&result)
+	return c.JSON(http.StatusOK, result)
 }
 
 func UpdateContact(c echo.Context) error {
-	userIDStr := c.Get("user_id").(string)
-	var uid pgtype.UUID
-	_ = uid.Scan(userIDStr)
-
-	contactIDStr := c.Param("id")
-	var contactID pgtype.UUID
-	_ = contactID.Scan(contactIDStr)
+	userID := c.Get("user_id").(string)
+	contactID := c.Param("id")
 
 	var req dto.UpdateContactRequest
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, echo.Map{"error": "invalid request"})
 	}
 
-	// For UpdateContact, we need to pass nullable parameters
-	// sqlc generates interface{} for nullable params if not configured otherwise, or *string
-	// SQL: COALESCE($3, name) -> implies we pass the value or null.
-	// We matched the query params to the DTO fields which are pointers.
-
-	params := sqlc.UpdateContactParams{
-		ID:          contactID,
-		UserID:      uid,
-		Name:        req.Name,
-		PhoneNumber: req.PhoneNumber,
-		ImageUri:    req.ImageURI,
-		Type:        req.Type,
-		IsPinned:    req.IsPinned,
+	// Verify ownership first
+	existing, err := db.Databases.GetDocument(
+		db.DatabaseID,
+		db.ContactsCollectionID,
+		contactID,
+	)
+	if err != nil {
+		return c.JSON(http.StatusNotFound, echo.Map{"error": "contact not found"})
 	}
 
-	contact, err := db.Queries.UpdateContact(c.Request().Context(), params)
+	var existingData map[string]interface{}
+	existing.Decode(&existingData)
+	if existingData["user_id"] != userID {
+		return c.JSON(http.StatusForbidden, echo.Map{"error": "not your contact"})
+	}
+
+	// Build partial update
+	data := make(map[string]interface{})
+	if req.Name != nil {
+		data["name"] = *req.Name
+	}
+	if req.PhoneNumber != nil {
+		data["phone_number"] = *req.PhoneNumber
+	}
+	if req.ImageURI != nil {
+		data["image_uri"] = *req.ImageURI
+	}
+	if req.Type != nil {
+		data["type"] = *req.Type
+	}
+	if req.IsPinned != nil {
+		data["is_pinned"] = *req.IsPinned
+	}
+
+	if len(data) == 0 {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "no fields to update"})
+	}
+
+	doc, err := db.Databases.UpdateDocument(
+		db.DatabaseID,
+		db.ContactsCollectionID,
+		contactID,
+		db.Databases.WithUpdateDocumentData(data),
+	)
 	if err != nil {
-		// Check if rows affected is 0? sqlc Update usually returns one.
-		// If using Exec results, we check error.
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed to update contact"})
 	}
 
-	return c.JSON(http.StatusOK, contact)
+	var result map[string]interface{}
+	doc.Decode(&result)
+	return c.JSON(http.StatusOK, result)
 }
 
 func DeleteContact(c echo.Context) error {
-	userIDStr := c.Get("user_id").(string)
-	var uid pgtype.UUID
-	_ = uid.Scan(userIDStr)
+	userID := c.Get("user_id").(string)
+	contactID := c.Param("id")
 
-	contactIDStr := c.Param("id")
-	var contactID pgtype.UUID
-	_ = contactID.Scan(contactIDStr)
-
-	params := sqlc.DeleteContactParams{
-		ID:     contactID,
-		UserID: uid,
+	// Verify ownership
+	existing, err := db.Databases.GetDocument(
+		db.DatabaseID,
+		db.ContactsCollectionID,
+		contactID,
+	)
+	if err != nil {
+		return c.JSON(http.StatusNotFound, echo.Map{"error": "contact not found"})
 	}
 
-	err := db.Queries.DeleteContact(c.Request().Context(), params)
+	var existingData map[string]interface{}
+	existing.Decode(&existingData)
+	if existingData["user_id"] != userID {
+		return c.JSON(http.StatusForbidden, echo.Map{"error": "not your contact"})
+	}
+
+	_, err = db.Databases.DeleteDocument(
+		db.DatabaseID,
+		db.ContactsCollectionID,
+		contactID,
+	)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed to delete contact"})
 	}
@@ -115,45 +168,81 @@ func DeleteContact(c echo.Context) error {
 }
 
 func ToggleContactType(c echo.Context) error {
-	userIDStr := c.Get("user_id").(string)
-	var uid pgtype.UUID
-	_ = uid.Scan(userIDStr)
+	userID := c.Get("user_id").(string)
+	contactID := c.Param("id")
 
-	contactIDStr := c.Param("id")
-	var contactID pgtype.UUID
-	_ = contactID.Scan(contactIDStr)
-
-	params := sqlc.ToggleContactTypeParams{
-		ID:     contactID,
-		UserID: uid,
+	existing, err := db.Databases.GetDocument(
+		db.DatabaseID,
+		db.ContactsCollectionID,
+		contactID,
+	)
+	if err != nil {
+		return c.JSON(http.StatusNotFound, echo.Map{"error": "contact not found"})
 	}
 
-	contact, err := db.Queries.ToggleContactType(c.Request().Context(), params)
+	var existingData map[string]interface{}
+	existing.Decode(&existingData)
+	if existingData["user_id"] != userID {
+		return c.JSON(http.StatusForbidden, echo.Map{"error": "not your contact"})
+	}
+
+	currentType, _ := existingData["type"].(string)
+	newType := "Trusted"
+	if currentType == "Trusted" {
+		newType = "Casual"
+	}
+
+	doc, err := db.Databases.UpdateDocument(
+		db.DatabaseID,
+		db.ContactsCollectionID,
+		contactID,
+		db.Databases.WithUpdateDocumentData(map[string]interface{}{
+			"type": newType,
+		}),
+	)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed to toggle type"})
 	}
 
-	return c.JSON(http.StatusOK, contact)
+	var result map[string]interface{}
+	doc.Decode(&result)
+	return c.JSON(http.StatusOK, result)
 }
 
 func ToggleContactPin(c echo.Context) error {
-	userIDStr := c.Get("user_id").(string)
-	var uid pgtype.UUID
-	_ = uid.Scan(userIDStr)
+	userID := c.Get("user_id").(string)
+	contactID := c.Param("id")
 
-	contactIDStr := c.Param("id")
-	var contactID pgtype.UUID
-	_ = contactID.Scan(contactIDStr)
-
-	params := sqlc.ToggleContactPinParams{
-		ID:     contactID,
-		UserID: uid,
+	existing, err := db.Databases.GetDocument(
+		db.DatabaseID,
+		db.ContactsCollectionID,
+		contactID,
+	)
+	if err != nil {
+		return c.JSON(http.StatusNotFound, echo.Map{"error": "contact not found"})
 	}
 
-	contact, err := db.Queries.ToggleContactPin(c.Request().Context(), params)
+	var existingData map[string]interface{}
+	existing.Decode(&existingData)
+	if existingData["user_id"] != userID {
+		return c.JSON(http.StatusForbidden, echo.Map{"error": "not your contact"})
+	}
+
+	currentPinned, _ := existingData["is_pinned"].(bool)
+
+	doc, err := db.Databases.UpdateDocument(
+		db.DatabaseID,
+		db.ContactsCollectionID,
+		contactID,
+		db.Databases.WithUpdateDocumentData(map[string]interface{}{
+			"is_pinned": !currentPinned,
+		}),
+	)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed to toggle pin"})
 	}
 
-	return c.JSON(http.StatusOK, contact)
+	var result map[string]interface{}
+	doc.Decode(&result)
+	return c.JSON(http.StatusOK, result)
 }
